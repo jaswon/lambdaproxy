@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"cmd/shared"
 
@@ -19,7 +20,7 @@ func connectSSH(host, user, key string) (*ssh.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ssh.Dial("tcp", host+":22", &ssh.ClientConfig{
+	return ssh.Dial("tcp", host, &ssh.ClientConfig{
 		User:            user,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Auth: []ssh.AuthMethod{
@@ -38,10 +39,8 @@ func getTunnel(client *ssh.Client, tunnel string) (*yamux.Session, error) {
 }
 
 func HandleRequest(req shared.Request) error {
-	log.Println("new proxy request")
-
-	log.Printf("connecting to %s", req.Address)
-	client, err := connectSSH(req.Address, req.User, req.Key)
+	log.Printf("new proxy request, connecting to %s", req.Host)
+	client, err := connectSSH(req.Host, req.User, req.Key)
 	if err != nil {
 		return err
 	}
@@ -54,13 +53,11 @@ func HandleRequest(req shared.Request) error {
 	}
 	defer tunnel.Close()
 
-	proxy := goproxy.NewProxyHttpServer()
-
-	server := http.Server{Handler: proxy}
-
 	log.Println("starting proxy server")
-	defer log.Println("closing proxy server")
-	return server.Serve(tunnel)
+	startTime := time.Now()
+
+	defer log.Printf("closing proxy server after %s", time.Since(startTime).String())
+	return http.Serve(tunnel, goproxy.NewProxyHttpServer())
 }
 
 func main() {
