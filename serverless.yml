@@ -1,0 +1,19 @@
+service: lambdaproxy
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: go1.x
+  lambdaHashingVersion: '20201221'
+
+package:
+  patterns:
+    - '!./**'
+    - bin/proxy
+
+functions:
+  proxy:
+    name: proxy
+    handler: bin/proxy
+    timeout: 900
