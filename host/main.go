@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/yamux"
 
+	"cmd/host/ip"
 	"cmd/host/tunneler"
 )
 
@@ -54,7 +55,8 @@ func main() {
 		log.Fatalf("failed to start forwarder: %+v", err)
 	}
 	defer forwarder.Close()
-	log.Printf("forwarder listening on %s", forwarder.Addr().String())
+	forwarderAddr := forwarder.Addr().String()
+	log.Printf("forwarder listening on %s", forwarderAddr)
 
 	// setup tunnel listener
 	tunnel, err := net.Listen("tcp", "")
@@ -72,14 +74,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to accept tunnel connection: %+v", err)
 	}
-	log.Println("tunnel connection established")
+	log.Printf("tunnel connection accepted from %s", conn.RemoteAddr())
 	defer conn.Close()
 
 	session, err := yamux.Client(conn, nil)
+	log.Printf("tunnel session established at %s", session.RemoteAddr())
 	defer session.Close()
 
 	// start forwarder
 	go serve(forwarder, session)
+
+	proxyIP, err := ip.ProxyGet("http://" + forwarderAddr)
+	if err != nil {
+		log.Fatalf("unable to get proxy ip: %+v", err)
+	}
+	log.Printf("proxy ip: %s", proxyIP)
 
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
