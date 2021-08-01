@@ -1,19 +1,66 @@
-package function
+package main
 
 import (
+	"log"
+	"net/http"
+
+	"cmd/shared"
+
+	"golang.org/x/crypto/ssh"
+
+	"github.com/elazarl/goproxy"
+	"github.com/hashicorp/yamux"
+
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-type Request struct {
-	Address string `json:"address"`
-	Port    string `json:"string"`
-	Key     string `json:"key"`
-	User    string `json:"user"`
+func connectSSH(host, user, key string) (*ssh.Client, error) {
+	signer, err := ssh.ParsePrivateKey([]byte(key))
+	if err != nil {
+		return nil, err
+	}
+	return ssh.Dial("tcp", host+":22", &ssh.ClientConfig{
+		User:            user,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		},
+	})
 }
 
-func HandleRequest(req Request) error {
+func getTunnel(client *ssh.Client, tunnel string) (*yamux.Session, error) {
+	service, err := client.Dial("tcp", tunnel)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	return yamux.Server(service, nil)
+}
+
+func HandleRequest(req shared.Request) error {
+	log.Println("new proxy request")
+
+	log.Printf("connecting to %s", req.Address)
+	client, err := connectSSH(req.Address, req.User, req.Key)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	log.Printf("establishing tunnel on %s", req.Tunnel)
+	tunnel, err := getTunnel(client, req.Tunnel)
+	if err != nil {
+		return err
+	}
+	defer tunnel.Close()
+
+	proxy := goproxy.NewProxyHttpServer()
+
+	server := http.Server{Handler: proxy}
+
+	log.Println("starting proxy server")
+	defer log.Println("closing proxy server")
+	return server.Serve(tunnel)
 }
 
 func main() {

@@ -15,17 +15,17 @@ import (
 )
 
 type Key interface {
-	Private() []byte
+	Private() string
 	Invalidate() error
 }
 
 type key struct {
 	authfile string
-	private  []byte
+	private  string
 	public   []byte
 }
 
-func (k *key) Private() []byte {
+func (k *key) Private() string {
 	return k.private
 }
 
@@ -75,7 +75,7 @@ func New(authfile string) (Key, error) {
 
 	return &key{
 		authfile: authfile,
-		private:  privateBytes,
+		private:  string(privateBytes),
 		public:   publicBytes,
 	}, nil
 }
