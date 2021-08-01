@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"net"
@@ -24,7 +25,9 @@ func serve(forwarder net.Listener, tunnel *yamux.Session) {
 	for {
 		c, err := forwarder.Accept()
 		if err != nil {
-			log.Printf("unable to accept forward request: %+v", err)
+			if !errors.Is(err, net.ErrClosed) {
+				log.Printf("unable to accept forward request: %+v", err)
+			}
 			return
 		}
 

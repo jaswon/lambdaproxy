@@ -56,7 +56,10 @@ func HandleRequest(req shared.Request) error {
 	log.Println("starting proxy server")
 	startTime := time.Now()
 
-	defer log.Printf("closing proxy server after %s", time.Since(startTime).String())
+	defer func() {
+		runtime := time.Since(startTime).String()
+		log.Printf("closing proxy server after %s", runtime)
+	}()
 	return http.Serve(tunnel, goproxy.NewProxyHttpServer())
 }
 
